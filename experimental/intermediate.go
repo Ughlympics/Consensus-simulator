@@ -13,7 +13,7 @@ func Step1() {
 	nodes := GenerateNodes(N, 0.1)
 	candidates := SelectCandidates(nodes, M)
 	delagates := SelectDelegates(candidates, K)
-	blocks := GenerateBlocks(delagates, E)
+	blocks := GenerateBlocks(delagates, E, 0.3, 0.1)
 
 	stat := ComputeMetrics(blocks)
 	fmt.Println(stat)

@@ -25,6 +25,7 @@ type Block struct {
 	Producer int
 	Valid    bool
 	Round    int
+	Forked   bool
 }
 
 type Metrics struct {
@@ -76,14 +77,28 @@ func SelectDelegates(candidates []Candidate, K int) []Delegate {
 	return delegates
 }
 
-func GenerateBlocks(delegates []Delegate, E int) []Block {
+func GenerateBlocks(delegates []Delegate, E int, alpha float64, pOff float64) []Block {
 
 	blocks := make([]Block, 0)
+
+	AssignMalicious(delegates, alpha)
 
 	for r := 0; r < E; r++ {
 		d := delegates[r%len(delegates)]
 
+		randVal := rand.Float64()
+
+		// delegate is offline with probability pOff
+		if randVal < pOff {
+			continue
+		}
+
 		valid := true
+
+		// if delegate is malicious, block is invalid
+		if d.IsMalicious == true {
+			valid = false
+		}
 
 		block := Block{
 			Round:    r,
@@ -116,5 +131,13 @@ func ComputeMetrics(blocks []Block) Metrics {
 		TotalBlocks:   total,
 		InvalidBlocks: invalid,
 		InvalidRate:   invalidRate,
+	}
+}
+
+func AssignMalicious(delegates []Delegate, alpha float64) {
+	for i := range delegates {
+		if rand.Float64() < alpha {
+			delegates[i].IsMalicious = true
+		}
 	}
 }
