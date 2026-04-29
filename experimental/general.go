@@ -37,24 +37,54 @@ type Metrics struct {
 func GenerateNodes(N int, gamma float64) []Node {
 	nodes := make([]Node, 0, N)
 
-	for i := 0; i < N; i++ {
-		stake := gamma * float64(100) // Example stake calculation, can be modified as needed
-		node := Node{ID: i, Stake: stake}
-		nodes = append(nodes, node)
+	whaleCount := int(0.01 * float64(N))
+	if whaleCount < 1 {
+		whaleCount = 1
 	}
+
+	totalStake := 10000.0
+	otherCount := N - whaleCount
+
+	whaleTotal := totalStake * gamma
+	otherTotal := totalStake * (1 - gamma)
+
+	whaleStake := whaleTotal / float64(whaleCount)
+	otherStake := otherTotal / float64(otherCount)
+
+	for i := 0; i < whaleCount; i++ {
+		nodes = append(nodes, Node{
+			ID:    i,
+			Stake: whaleStake,
+		})
+	}
+
+	for i := 0; i < otherCount; i++ {
+		nodes = append(nodes, Node{
+			ID:    whaleCount + i,
+			Stake: otherStake,
+		})
+	}
+
+	rand.Shuffle(len(nodes), func(i, j int) {
+		nodes[i], nodes[j] = nodes[j], nodes[i]
+	})
+
 	return nodes
 }
 
 func SelectCandidates(nodes []Node, M int) []Candidate {
 	candidates := make([]Candidate, 0, M)
 
-	rand.Shuffle(len(nodes), func(i, j int) {
-		nodes[i], nodes[j] = nodes[j], nodes[i]
+	shuffled := make([]Node, len(nodes))
+	copy(shuffled, nodes)
+
+	rand.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})
 
 	for i := 0; i < M; i++ {
 		candidates = append(candidates, Candidate{
-			ID: nodes[i].ID,
+			ID: shuffled[i].ID,
 		})
 	}
 
@@ -139,5 +169,16 @@ func AssignMalicious(delegates []Delegate, alpha float64) {
 		if rand.Float64() < alpha {
 			delegates[i].IsMalicious = true
 		}
+	}
+}
+
+func VoteRandom(nodes []Node, candidates []Candidate) {
+	for i := range candidates {
+		candidates[i].Votes = 0
+	}
+
+	for _, n := range nodes {
+		choice := rand.Intn(len(candidates))
+		candidates[choice].Votes += n.Stake
 	}
 }
