@@ -9,6 +9,7 @@ type Node struct {
 	ID       int
 	Stake    float64
 	VotedFor int
+	IsWhale  bool
 }
 
 type Candidate struct {
@@ -34,8 +35,9 @@ type Metrics struct {
 	InvalidRate   float64
 }
 
-func GenerateNodes(N int, gamma float64) []Node {
+func GenerateNodes(N int, gamma float64) ([]Node, []int) {
 	nodes := make([]Node, 0, N)
+	whaleIDs := []int{}
 
 	whaleCount := int(0.01 * float64(N))
 	if whaleCount < 1 {
@@ -53,15 +55,17 @@ func GenerateNodes(N int, gamma float64) []Node {
 
 	for i := 0; i < whaleCount; i++ {
 		nodes = append(nodes, Node{
-			ID:    i,
-			Stake: whaleStake,
+			ID:      i,
+			Stake:   whaleStake,
+			IsWhale: true,
 		})
 	}
 
 	for i := 0; i < otherCount; i++ {
 		nodes = append(nodes, Node{
-			ID:    whaleCount + i,
-			Stake: otherStake,
+			ID:      whaleCount + i,
+			Stake:   otherStake,
+			IsWhale: false,
 		})
 	}
 
@@ -69,7 +73,16 @@ func GenerateNodes(N int, gamma float64) []Node {
 		nodes[i], nodes[j] = nodes[j], nodes[i]
 	})
 
-	return nodes
+	//search for whales and record their IDs
+	whaleIDs = whaleIDs[:0]
+
+	for i, n := range nodes {
+		if n.Stake == whaleStake {
+			whaleIDs = append(whaleIDs, i)
+		}
+	}
+
+	return nodes, whaleIDs
 }
 
 func SelectCandidates(nodes []Node, M int) []Candidate {
@@ -92,6 +105,10 @@ func SelectCandidates(nodes []Node, M int) []Candidate {
 }
 
 func SelectDelegates(candidates []Candidate, K int) []Delegate {
+	if K > len(candidates) {
+		K = len(candidates)
+	}
+
 	delegates := make([]Delegate, 0, K)
 
 	sort.Slice(candidates, func(i, j int) bool {
@@ -107,7 +124,13 @@ func SelectDelegates(candidates []Candidate, K int) []Delegate {
 	return delegates
 }
 
-func GenerateBlocks(delegates []Delegate, E int, alpha float64, pOff float64) []Block {
+func GenerateBlocks(
+	delegates []Delegate,
+	E int,
+	alpha float64,
+	pOff float64,
+	pInv float64,
+	tau float64) []Block {
 
 	blocks := make([]Block, 0)
 
@@ -169,16 +192,5 @@ func AssignMalicious(delegates []Delegate, alpha float64) {
 		if rand.Float64() < alpha {
 			delegates[i].IsMalicious = true
 		}
-	}
-}
-
-func VoteRandom(nodes []Node, candidates []Candidate) {
-	for i := range candidates {
-		candidates[i].Votes = 0
-	}
-
-	for _, n := range nodes {
-		choice := rand.Intn(len(candidates))
-		candidates[choice].Votes += n.Stake
 	}
 }
