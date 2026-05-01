@@ -29,15 +29,14 @@ type Block struct {
 	Forked   bool
 }
 
-type Metrics struct {
+type GlobalMetrics struct {
 	TotalBlocks   int
 	InvalidBlocks int
 	InvalidRate   float64
 }
 
-func GenerateNodes(N int, gamma float64) ([]Node, []int) {
+func GenerateNodes(N int, gamma float64) []Node {
 	nodes := make([]Node, 0, N)
-	whaleIDs := []int{}
 
 	whaleCount := int(0.01 * float64(N))
 	if whaleCount < 1 {
@@ -73,16 +72,7 @@ func GenerateNodes(N int, gamma float64) ([]Node, []int) {
 		nodes[i], nodes[j] = nodes[j], nodes[i]
 	})
 
-	//search for whales and record their IDs
-	whaleIDs = whaleIDs[:0]
-
-	for i, n := range nodes {
-		if n.Stake == whaleStake {
-			whaleIDs = append(whaleIDs, i)
-		}
-	}
-
-	return nodes, whaleIDs
+	return nodes
 }
 
 func SelectCandidates(nodes []Node, M int) []Candidate {
@@ -148,15 +138,21 @@ func GenerateBlocks(
 
 		valid := true
 
-		// if delegate is malicious, block is invalid
-		if d.IsMalicious == true {
+		// if delegate is malicious, block is invalid with probability pInv
+		if d.IsMalicious && rand.Float64() < pInv {
 			valid = false
+		}
+
+		forked := false
+		if rand.Float64() < tau {
+			forked = true
 		}
 
 		block := Block{
 			Round:    r,
 			Producer: d.ID,
 			Valid:    valid,
+			Forked:   forked,
 		}
 
 		blocks = append(blocks, block)
@@ -165,7 +161,7 @@ func GenerateBlocks(
 	return blocks
 }
 
-func ComputeMetrics(blocks []Block) Metrics {
+func ComputeMetrics(blocks []Block) GlobalMetrics {
 	total := len(blocks)
 	invalid := 0
 
@@ -180,7 +176,7 @@ func ComputeMetrics(blocks []Block) Metrics {
 		invalidRate = float64(invalid) / float64(total)
 	}
 
-	return Metrics{
+	return GlobalMetrics{
 		TotalBlocks:   total,
 		InvalidBlocks: invalid,
 		InvalidRate:   invalidRate,

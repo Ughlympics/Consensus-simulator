@@ -18,7 +18,6 @@ func VoteRandom(nodes []Node, candidates []Candidate) {
 func VoteWhaleForOneCandidate(
 	nodes []Node,
 	candidates []Candidate,
-	whaleIDs []int,
 	K int) []Candidate {
 	for i := range nodes {
 		nodes[i].VotedFor = -1
