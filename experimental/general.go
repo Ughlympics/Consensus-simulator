@@ -30,9 +30,18 @@ type Block struct {
 }
 
 type GlobalMetrics struct {
-	TotalBlocks   int
-	InvalidBlocks int
-	InvalidRate   float64
+	TotalSlots     int
+	ProducedBlocks int
+	ValidBlocks    int
+	InvalidBlocks  int
+
+	Availability float64
+	InvalidShare float64
+	ForkRate     float64
+	Latency      float64
+
+	Capture       bool
+	Concentration float64
 }
 
 func GenerateNodes(N int, gamma float64) []Node {
@@ -161,25 +170,103 @@ func GenerateBlocks(
 	return blocks
 }
 
-func ComputeMetrics(blocks []Block) GlobalMetrics {
-	total := len(blocks)
+func ComputeMetrics(blocks []Block, totalSlots int, delegates []Delegate) GlobalMetrics {
+	produced := len(blocks)
+	valid := 0
 	invalid := 0
+	forks := 0
+
+	lastRound := -1
+	totalGap := 0
+	gapCount := 0
 
 	for _, b := range blocks {
-		if !b.Valid {
+		if b.Valid {
+			valid++
+		} else {
 			invalid++
 		}
+
+		if b.Forked {
+			forks++
+		}
+
+		// latency (gap between produced blocks)
+		if lastRound != -1 {
+			gap := b.Round - lastRound
+			totalGap += gap
+			gapCount++
+		}
+		lastRound = b.Round
 	}
 
-	invalidRate := 0.0
-	if total > 0 {
-		invalidRate = float64(invalid) / float64(total)
+	availability := 0.0
+	if totalSlots > 0 {
+		availability = float64(valid) / float64(totalSlots)
+	}
+
+	invalidShare := 0.0
+	forkRate := 0.0
+
+	if produced > 0 {
+		invalidShare = float64(invalid) / float64(produced)
+		forkRate = float64(forks) / float64(produced)
+	}
+
+	latency := 0.0
+	if gapCount > 0 {
+		latency = float64(totalGap) / float64(gapCount)
+	}
+
+	//Capture
+	malicious := 0
+	for _, d := range delegates {
+		if d.IsMalicious {
+			malicious++
+		}
+	}
+	capture := float64(malicious)/float64(len(delegates)) > 0.5
+
+	//Concentration (top-3 delegates by votes / total votes)
+	sort.Slice(delegates, func(i, j int) bool {
+		return delegates[i].Votes > delegates[j].Votes
+	})
+
+	top := 3
+	if len(delegates) < top {
+		top = len(delegates)
+	}
+
+	topVotes := 0.0
+	totalVotes := 0.0
+
+	for _, d := range delegates {
+		totalVotes += d.Votes
+	}
+
+	for i := 0; i < top; i++ {
+		topVotes += delegates[i].Votes
+	}
+
+	concentration := 0.0
+	if totalVotes > 0 {
+		concentration = topVotes / totalVotes
 	}
 
 	return GlobalMetrics{
-		TotalBlocks:   total,
+		TotalSlots:     totalSlots,
+		ProducedBlocks: produced,
+
+		ValidBlocks:   valid,
 		InvalidBlocks: invalid,
-		InvalidRate:   invalidRate,
+
+		Availability: availability,
+		InvalidShare: invalidShare,
+		ForkRate:     forkRate,
+		Latency:      latency,
+
+		Capture:       capture,
+		Concentration: concentration,
 	}
 }
 
